@@ -1,52 +1,70 @@
-import { fetchRedis } from '@/helpers/redis';
-import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
-import { getServerSession } from 'next-auth/next';
-import { addFriendValidator } from '../../../../lib/validations/add-friend';
-import { z } from 'zod';
+import { fetchRedis } from "@/helpers/redis";
+import { authOptions } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { getServerSession } from "next-auth/next";
+import { addFriendValidator } from "../../../../lib/validations/add-friend";
+import { z } from "zod";
+import { toPusherKey } from "@/lib/utils";
+import { pusherServer } from "@/lib/pusher";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const { email: emailToAdd } = addFriendValidator.parse(body.email)
+    const { email: emailToAdd } = addFriendValidator.parse(body.email);
 
     const idToAdd = (await fetchRedis(
-      'get',
+      "get",
       `user:email:${emailToAdd}`
-    )) as string
+    )) as string;
 
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions);
     if (!session) {
-      return new Response('Unauthorized', { status: 401 });
+      return new Response("Unauthorized", { status: 401 });
     }
-    
+
     if (!idToAdd) {
-      return new Response('User not found', { status: 404 });
+      return new Response("User not found", { status: 404 });
     }
 
     if (idToAdd === session.user.id) {
-      return new Response('You cannot add yourself', { status: 400 });
+      return new Response("You cannot add yourself", { status: 400 });
     }
 
     // check if user already added
-    const isAlreadyAdded = await fetchRedis('sismember', `user:${idToAdd}:incoming_friend_requests`, session.user.id) as 0 | 1;
+    const isAlreadyAdded = (await fetchRedis(
+      "sismember",
+      `user:${idToAdd}:incoming_friend_requests`,
+      session.user.id
+    )) as 0 | 1;
     if (isAlreadyAdded) {
-      return new Response('Already added this user', { status: 400 });
+      return new Response("Already added this user", { status: 400 });
     }
     // check if user is already friends
-    const isAlreadyFriends = await fetchRedis('sismember', `user:${idToAdd}:friends`, session.user.id) as 0 | 1;
+    const isAlreadyFriends = (await fetchRedis(
+      "sismember",
+      `user:${idToAdd}:friends`,
+      session.user.id
+    )) as 0 | 1;
     if (isAlreadyFriends) {
-      return new Response('Already friends', { status: 400 });
+      return new Response("Already friends", { status: 400 });
     }
 
     // valid request
+    pusherServer.trigger(
+      toPusherKey(`user:${idToAdd}:incoming_friend_requests`),
+      "incoming_friend_requests",
+      {
+        senderId: session.user.id,
+        senderEmail: session.user.email,
+      }
+    );
     db.sadd(`user:${idToAdd}:incoming_friend_requests`, session.user.id);
-    return new Response('OK')
+    return new Response("OK");
   } catch (err) {
-    if(err instanceof z.ZodError) {
-      return new Response('Invalid request payload', { status: 422 });
+    if (err instanceof z.ZodError) {
+      return new Response("Invalid request payload", { status: 422 });
     }
-    return new Response('Invalid request', { status: 400 });
+    return new Response("Invalid request", { status: 400 });
   }
 }

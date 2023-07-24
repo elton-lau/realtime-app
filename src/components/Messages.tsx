@@ -14,6 +14,9 @@ interface MessagesProps {
 
 const Messages: FC<MessagesProps> = ({ initialMessages, sessionId, sessionImage, chatPartner }) => {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
+
+  
+
   const scrollDownRef = useRef<HTMLDivElement | null>(null);
 
   const formatTimestamp = (timestamp: number) => {
