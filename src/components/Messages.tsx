@@ -1,21 +1,34 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn, toPusherKey } from "@/lib/utils";
 import { format } from "date-fns";
-import { FC, useRef, useState } from "react";
+import { FC, useEffect, useRef, useState } from "react";
 import Image from 'next/image'
+import { pusherClient } from "@/lib/pusher";
 
 interface MessagesProps {
+  chatId: string;
   initialMessages: Message[];
   sessionId: string;
   sessionImage: string | null | undefined;
   chatPartner: User
 }
 
-const Messages: FC<MessagesProps> = ({ initialMessages, sessionId, sessionImage, chatPartner }) => {
+const Messages: FC<MessagesProps> = ({ initialMessages, sessionId, sessionImage, chatPartner, chatId }) => {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
 
-  
+  const messageHandler = (message: Message) => {
+    setMessages((prev) => [message, ...prev])
+  }
+
+  useEffect(() => {
+    pusherClient.subscribe(toPusherKey(`chat:${chatId}`))
+    pusherClient.bind('incoming-message', messageHandler)
+    return () => {
+      pusherClient.unsubscribe(toPusherKey(`chat:${chatId}`))
+      pusherClient.unbind('incoming-message', messageHandler)
+    }
+  }, [])
 
   const scrollDownRef = useRef<HTMLDivElement | null>(null);
 

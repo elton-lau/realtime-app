@@ -22,7 +22,6 @@ const FriendRequestSidebarOptions: FC<FriendRequestSidebarOptionsProps> = ({init
     setUnseenRequestCount((prev) => prev + 1);
   }
 
-
   useEffect(() => {
     pusherClient.subscribe(toPusherKey(`user:${sessionId}:incoming_friend_requests`))
     pusherClient.bind('incoming_friend_requests', friendRequestHandler)

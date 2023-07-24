@@ -1,9 +1,11 @@
 import { fetchRedis } from "@/helpers/redis";
 import { db } from "@/lib/db";
+import { pusherServer } from "@/lib/pusher";
 import { messageValidator } from "@/lib/validations/message";
 import { nanoid } from "nanoid";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../lib/auth";
+import { toPusherKey } from '../../../../lib/utils';
 
 export async function POST(req: Request, res: Response) {
   try {
@@ -51,6 +53,7 @@ export async function POST(req: Request, res: Response) {
     const message = messageValidator.parse(messageData);
 
     // all valid, send the message
+    pusherServer.trigger(toPusherKey(`chat:${chatId}`), 'incoming-message', message)
     await db.zadd(`chat:${chatId}:messages`, {
       score: timestamp,
       member: JSON.stringify(message),
